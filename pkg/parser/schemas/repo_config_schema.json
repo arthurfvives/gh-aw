@@ -49,6 +49,19 @@
           }
         }
       ]
+    },
+    "models": {
+      "description": "Model alias map grouped by engine. Maps short alias names to actual model identifiers. For example, { \"copilot\": { \"small\": \"gpt-5.4-codex-mini\" } } allows using engine.model: \"small\" in workflow frontmatter.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Model aliases for a specific engine. Keys are alias names, values are actual model identifiers.",
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The actual model identifier that the alias resolves to."
+        }
+      }
     }
   }
 }

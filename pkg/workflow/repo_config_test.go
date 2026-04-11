@@ -97,6 +97,149 @@ func TestLoadRepoConfig_UnknownProperty(t *testing.T) {
 	assert.Error(t, err, "unknown property should fail schema validation (additionalProperties: false)")
 }
 
+func TestLoadRepoConfig_ModelsMap(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{
+		"models": {
+			"copilot": {
+				"small": "gpt-5.4-codex-mini",
+				"large": "gpt-5"
+			},
+			"claude": {
+				"fast": "claude-haiku-4.5"
+			}
+		}
+	}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err, "valid aw.json with models should load without error")
+	require.NotNil(t, cfg.Models, "models map should be populated")
+	assert.Len(t, cfg.Models, 2, "should have two engine entries")
+	assert.Equal(t, "gpt-5.4-codex-mini", cfg.Models["copilot"]["small"], "copilot small alias should resolve")
+	assert.Equal(t, "gpt-5", cfg.Models["copilot"]["large"], "copilot large alias should resolve")
+	assert.Equal(t, "claude-haiku-4.5", cfg.Models["claude"]["fast"], "claude fast alias should resolve")
+}
+
+func TestLoadRepoConfig_ModelsEmptyObject(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{"models": {}}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err, "empty models object should load without error")
+	assert.Empty(t, cfg.Models, "models map should be empty")
+}
+
+func TestLoadRepoConfig_ModelsWithMaintenance(t *testing.T) {
+	dir := t.TempDir()
+	writeAWJSON(t, dir, `{
+		"maintenance": {"runs_on": "ubuntu-latest"},
+		"models": {"copilot": {"small": "gpt-5.4-codex-mini"}}
+	}`)
+
+	cfg, err := LoadRepoConfig(dir)
+	require.NoError(t, err, "aw.json with both maintenance and models should load without error")
+	require.NotNil(t, cfg.Maintenance, "maintenance should be set")
+	assert.Equal(t, RunsOnValue{"ubuntu-latest"}, cfg.Maintenance.RunsOn, "maintenance runs_on should be set")
+	require.NotNil(t, cfg.Models, "models should be set")
+	assert.Equal(t, "gpt-5.4-codex-mini", cfg.Models["copilot"]["small"], "model alias should resolve")
+}
+
+func TestResolveModelAlias(t *testing.T) {
+	tests := []struct {
+		name         string
+		config       *RepoConfig
+		engineID     string
+		model        string
+		wantResolved string
+		wantIsAlias  bool
+	}{
+		{
+			name:         "nil config returns model unchanged",
+			config:       nil,
+			engineID:     "copilot",
+			model:        "small",
+			wantResolved: "small",
+			wantIsAlias:  false,
+		},
+		{
+			name:         "empty models returns model unchanged",
+			config:       &RepoConfig{},
+			engineID:     "copilot",
+			model:        "small",
+			wantResolved: "small",
+			wantIsAlias:  false,
+		},
+		{
+			name: "matching alias resolves",
+			config: &RepoConfig{
+				Models: map[string]map[string]string{
+					"copilot": {"small": "gpt-5.4-codex-mini"},
+				},
+			},
+			engineID:     "copilot",
+			model:        "small",
+			wantResolved: "gpt-5.4-codex-mini",
+			wantIsAlias:  true,
+		},
+		{
+			name: "non-matching alias returns model unchanged",
+			config: &RepoConfig{
+				Models: map[string]map[string]string{
+					"copilot": {"small": "gpt-5.4-codex-mini"},
+				},
+			},
+			engineID:     "copilot",
+			model:        "large",
+			wantResolved: "large",
+			wantIsAlias:  false,
+		},
+		{
+			name: "different engine returns model unchanged",
+			config: &RepoConfig{
+				Models: map[string]map[string]string{
+					"copilot": {"small": "gpt-5.4-codex-mini"},
+				},
+			},
+			engineID:     "claude",
+			model:        "small",
+			wantResolved: "small",
+			wantIsAlias:  false,
+		},
+		{
+			name: "empty model returns empty unchanged",
+			config: &RepoConfig{
+				Models: map[string]map[string]string{
+					"copilot": {"small": "gpt-5.4-codex-mini"},
+				},
+			},
+			engineID:     "copilot",
+			model:        "",
+			wantResolved: "",
+			wantIsAlias:  false,
+		},
+		{
+			name: "exact model name is not aliased",
+			config: &RepoConfig{
+				Models: map[string]map[string]string{
+					"copilot": {"small": "gpt-5.4-codex-mini"},
+				},
+			},
+			engineID:     "copilot",
+			model:        "gpt-5.4-codex-mini",
+			wantResolved: "gpt-5.4-codex-mini",
+			wantIsAlias:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolved, isAlias := tt.config.ResolveModelAlias(tt.engineID, tt.model)
+			assert.Equal(t, tt.wantResolved, resolved, "resolved model should match")
+			assert.Equal(t, tt.wantIsAlias, isAlias, "isAlias flag should match")
+		})
+	}
+}
+
 // TestFormatRunsOn tests the YAML serialisation of runs-on values.
 func TestFormatRunsOn(t *testing.T) {
 	const def = "ubuntu-slim"

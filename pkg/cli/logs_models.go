@@ -286,6 +286,7 @@ type AwInfo struct {
 	EngineID        string              `json:"engine_id"`
 	EngineName      string              `json:"engine_name"`
 	Model           string              `json:"model"`
+	ModelAlias      string              `json:"model_alias,omitempty"` // Original alias name when model was resolved from aw.json aliases
 	Version         string              `json:"version"`
 	CLIVersion      string              `json:"cli_version,omitempty"` // gh-aw CLI version
 	WorkflowName    string              `json:"workflow_name"`

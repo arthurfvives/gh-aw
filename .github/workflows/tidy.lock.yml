@@ -98,6 +98,8 @@ jobs:
       comment_url: ${{ steps.add-comment.outputs.comment-url }}
       lockdown_check_failed: ${{ steps.generate_aw_info.outputs.lockdown_check_failed == 'true' }}
       model: ${{ steps.generate_aw_info.outputs.model }}
+      model_alias: ${{ steps.generate_aw_info.outputs.model_alias }}
+      resolved_model: ${{ steps.generate_aw_info.outputs.resolved_model }}
       secret_verification_result: ${{ steps.validate-secret.outputs.verification_result }}
       setup-trace-id: ${{ steps.setup.outputs.trace-id }}
       slash_command: ${{ needs.pre_activation.outputs.matched_command }}

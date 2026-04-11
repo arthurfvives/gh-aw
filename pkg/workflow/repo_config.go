@@ -76,6 +76,12 @@ type RepoConfig struct {
 	// and an object was provided (nil when maintenance is not configured or is
 	// disabled).
 	Maintenance *MaintenanceConfig
+
+	// Models is a map of engine name → (alias → actual model identifier).
+	// For example: {"copilot": {"small": "gpt-5.4-codex-mini"}}.
+	// When a workflow configures engine.model with an alias, the compiler resolves
+	// it to the actual model identifier at compile time.
+	Models map[string]map[string]string
 }
 
 // UnmarshalJSON implements json.Unmarshaler to handle the polymorphic maintenance
@@ -83,11 +89,15 @@ type RepoConfig struct {
 func (r *RepoConfig) UnmarshalJSON(data []byte) error {
 	// Use an intermediate struct with json.RawMessage to defer maintenance parsing.
 	var raw struct {
-		Maintenance json.RawMessage `json:"maintenance,omitempty"`
+		Maintenance json.RawMessage              `json:"maintenance,omitempty"`
+		Models      map[string]map[string]string `json:"models,omitempty"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+
+	// Parse models map (straightforward JSON deserialization).
+	r.Models = raw.Models
 
 	if len(raw.Maintenance) == 0 || string(raw.Maintenance) == "null" {
 		return nil
@@ -139,6 +149,28 @@ func LoadRepoConfig(gitRoot string) (*RepoConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+// ResolveModelAlias looks up a model alias in the models map for the given engine.
+// If the model matches an alias, it returns the resolved model identifier and true.
+// If the model is not an alias (or no models are configured), it returns the original
+// model unchanged and false.
+func (r *RepoConfig) ResolveModelAlias(engineID, model string) (resolved string, isAlias bool) {
+	if r == nil || len(r.Models) == 0 || model == "" {
+		return model, false
+	}
+
+	engineAliases, ok := r.Models[engineID]
+	if !ok || len(engineAliases) == 0 {
+		return model, false
+	}
+
+	if resolvedModel, found := engineAliases[model]; found {
+		repoConfigLog.Printf("Resolved model alias %q -> %q for engine %q", model, resolvedModel, engineID)
+		return resolvedModel, true
+	}
+
+	return model, false
 }
 
 // validateRepoConfigJSON validates raw JSON bytes against the repo config schema.

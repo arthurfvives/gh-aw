@@ -37,6 +37,13 @@ func WithFailFast(failFast bool) CompilerOption {
 	return func(c *Compiler) { c.failFast = failFast }
 }
 
+// WithRepoConfig sets the repository-level configuration (aw.json).
+// When set, the compiler uses it for model alias resolution and other
+// repository-level settings.
+func WithRepoConfig(cfg *RepoConfig) CompilerOption {
+	return func(c *Compiler) { c.repoConfig = cfg }
+}
+
 // WithWorkflowIdentifier sets the identifier for the current workflow being compiled
 func WithWorkflowIdentifier(identifier string) CompilerOption {
 	return func(c *Compiler) { c.workflowIdentifier = identifier }
@@ -89,6 +96,7 @@ type Compiler struct {
 	skipHeader              bool                     // If true, skip ASCII art header in generated YAML (for Wasm/editor mode)
 	inlinePrompt            bool                     // If true, inline markdown content in YAML instead of using runtime-import macros (for Wasm builds)
 	priorManifests          map[string]*GHAWManifest // Pre-cached manifests keyed by lock file path; takes precedence over git HEAD / filesystem reads
+	repoConfig              *RepoConfig              // Repository-level configuration from aw.json (model aliases, maintenance, etc.)
 }
 
 // NewCompiler creates a new workflow compiler with functional options.
@@ -289,6 +297,17 @@ func (c *Compiler) GetSafeUpdateWarnings() []string {
 // SetPriorManifests replaces the entire pre-cached manifest map.
 func (c *Compiler) SetPriorManifests(manifests map[string]*GHAWManifest) {
 	c.priorManifests = manifests
+}
+
+// GetGitRoot returns the git repository root directory detected by the compiler.
+func (c *Compiler) GetGitRoot() string {
+	return c.gitRoot
+}
+
+// SetRepoConfig sets the repository-level configuration (aw.json) for model
+// alias resolution and other repository-level settings.
+func (c *Compiler) SetRepoConfig(cfg *RepoConfig) {
+	c.repoConfig = cfg
 }
 
 // getSharedActionResolver returns the shared action resolver, initializing it on first use

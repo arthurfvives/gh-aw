@@ -96,14 +96,20 @@ func (c *Compiler) generateWorkflowHeader(yaml *strings.Builder, data *WorkflowD
 		} else if data.AI != "" {
 			agentInfo.AgentID = data.AI
 		}
-		// Agent model: only include if statically configured
+		// Agent model: only include if statically configured.
+		// Resolve aliases so the lock metadata records the actual model identifier.
 		if data.EngineConfig != nil && data.EngineConfig.Model != "" {
-			agentInfo.AgentModel = data.EngineConfig.Model
+			resolved, _ := c.resolveModelAlias(agentInfo.AgentID, data.EngineConfig.Model)
+			agentInfo.AgentModel = resolved
 		}
 		// Detection agent info: only if threat detection has its own engine config
 		if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.EngineConfig != nil {
-			agentInfo.DetectionAgentID = data.SafeOutputs.ThreatDetection.EngineConfig.ID
-			agentInfo.DetectionAgentModel = data.SafeOutputs.ThreatDetection.EngineConfig.Model
+			detectionID := data.SafeOutputs.ThreatDetection.EngineConfig.ID
+			agentInfo.DetectionAgentID = detectionID
+			if data.SafeOutputs.ThreatDetection.EngineConfig.Model != "" {
+				resolved, _ := c.resolveModelAlias(detectionID, data.SafeOutputs.ThreatDetection.EngineConfig.Model)
+				agentInfo.DetectionAgentModel = resolved
+			}
 		}
 		metadata := GenerateLockMetadata(frontmatterHash, data.StopTime, c.effectiveStrictMode(data.RawFrontmatter), agentInfo)
 		metadataJSON, err := metadata.ToJSON()
@@ -678,6 +684,21 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 		}
 	}
 
+	// Resolve model alias from aw.json when model is explicitly configured.
+	// The alias (original value) is preserved for metadata; the resolved model
+	// is used by the engine at runtime.
+	var modelAlias string
+	var resolvedModel string
+	if modelConfigured {
+		resolved, isAlias := c.resolveModelAlias(engineID, data.EngineConfig.Model)
+		if isAlias {
+			modelAlias = data.EngineConfig.Model
+			resolvedModel = resolved
+		} else {
+			resolvedModel = data.EngineConfig.Model
+		}
+	}
+
 	// Agent version - use the actual installation version (includes defaults)
 	agentVersion := getInstallationVersion(data, engine)
 
@@ -734,7 +755,10 @@ func (c *Compiler) generateCreateAwInfo(yaml *strings.Builder, data *WorkflowDat
 	fmt.Fprintf(yaml, "          GH_AW_INFO_ENGINE_ID: \"%s\"\n", engineID)
 	fmt.Fprintf(yaml, "          GH_AW_INFO_ENGINE_NAME: \"%s\"\n", engine.GetDisplayName())
 	if modelConfigured {
-		fmt.Fprintf(yaml, "          GH_AW_INFO_MODEL: \"%s\"\n", data.EngineConfig.Model)
+		fmt.Fprintf(yaml, "          GH_AW_INFO_MODEL: \"%s\"\n", resolvedModel)
+		if modelAlias != "" {
+			fmt.Fprintf(yaml, "          GH_AW_INFO_MODEL_ALIAS: \"%s\"\n", modelAlias)
+		}
 	} else {
 		// Use the engine's default model as fallback when neither explicit model nor
 		// model variable is configured, so the run details show "auto" rather than "(none)".

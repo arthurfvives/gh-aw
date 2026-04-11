@@ -100,6 +100,18 @@ func createAndConfigureCompiler(config CompileConfig) *workflow.Compiler {
 	)
 	compileCompilerSetupLog.Print("Created compiler instance")
 
+	// Load repository-level configuration (aw.json) for model aliases and other settings.
+	// Uses the compiler's auto-detected git root for path resolution.
+	if gitRoot := compiler.GetGitRoot(); gitRoot != "" {
+		repoConfig, err := workflow.LoadRepoConfig(gitRoot)
+		if err != nil {
+			compileCompilerSetupLog.Printf("Warning: failed to load repo config: %v", err)
+		} else if repoConfig != nil {
+			compiler.SetRepoConfig(repoConfig)
+			compileCompilerSetupLog.Print("Loaded repo config (aw.json) for model alias resolution")
+		}
+	}
+
 	// Configure compiler flags
 	configureCompilerFlags(compiler, config)
 

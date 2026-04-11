@@ -55,6 +55,7 @@ async function main(core, ctx) {
     engine_id: process.env.GH_AW_INFO_ENGINE_ID || "",
     engine_name: process.env.GH_AW_INFO_ENGINE_NAME || "",
     model: process.env.GH_AW_INFO_MODEL || "",
+    model_alias: process.env.GH_AW_INFO_MODEL_ALIAS || "",
     version: process.env.GH_AW_INFO_VERSION || "",
     agent_version: process.env.GH_AW_INFO_AGENT_VERSION || "",
     workflow_name: process.env.GH_AW_INFO_WORKFLOW_NAME || "",
@@ -152,6 +153,12 @@ async function main(core, ctx) {
 
   // Set model as output for reuse in other steps/jobs
   core.setOutput("model", awInfo.model);
+
+  // Set resolved model and alias outputs.
+  // resolved_model is the actual model identifier (same as model after alias resolution).
+  // model_alias is the original alias name (empty when no alias was used).
+  core.setOutput("resolved_model", awInfo.model);
+  core.setOutput("model_alias", awInfo.model_alias);
 
   // Generate workflow overview and write to step summary
   await generateWorkflowOverview(core);

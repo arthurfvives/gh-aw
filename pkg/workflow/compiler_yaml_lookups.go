@@ -52,6 +52,15 @@ func getDefaultAgentModel(engineID string) string {
 	}
 }
 
+// resolveModelAlias resolves a model alias from the repository configuration (aw.json).
+// Returns the resolved model and true if an alias was found, or the original model and false otherwise.
+func (c *Compiler) resolveModelAlias(engineID, model string) (string, bool) {
+	if c.repoConfig == nil || model == "" {
+		return model, false
+	}
+	return c.repoConfig.ResolveModelAlias(engineID, model)
+}
+
 // versionToGitRef converts a compiler version string to a valid git ref for use
 // in actions/checkout ref: fields.
 //

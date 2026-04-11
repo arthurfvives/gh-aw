@@ -82,6 +82,11 @@ func (c *Compiler) buildActivationJob(data *WorkflowData, preActivationJobCreate
 	steps = append(steps, awInfoYaml.String())
 	// Expose the model output from the activation job so downstream jobs can reference it
 	outputs["model"] = "${{ steps.generate_aw_info.outputs.model }}"
+	// Expose the resolved model and model alias outputs for downstream consumption.
+	// resolved_model contains the actual model identifier (after alias resolution);
+	// model_alias contains the original alias name (empty when no alias was used).
+	outputs["resolved_model"] = "${{ steps.generate_aw_info.outputs.resolved_model }}"
+	outputs["model_alias"] = "${{ steps.generate_aw_info.outputs.model_alias }}"
 	// Track whether the lockdown check failed so the conclusion job can surface
 	// the configuration error in the failure issue even when the agent never ran.
 	outputs["lockdown_check_failed"] = "${{ steps.generate_aw_info.outputs.lockdown_check_failed == 'true' }}"
