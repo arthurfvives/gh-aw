@@ -182,7 +182,14 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 	// Comment separator
 	steps = append(steps, "      # --- Threat Detection ---\n")
 
-	// Step 0: Pull AWF container images - the detection engine runs inside AWF (firewall),
+	// Step 0a: Clean stale firewall directories left by the agent artifact download.
+	// Since #25868, the unified agent artifact includes firewall audit/log files.
+	// The detection job downloads this artifact to /tmp/gh-aw/, which pre-populates
+	// the firewall directories with stale squid.conf, cache.log, etc. from the agent.
+	// AWF's squid container fails to start (exit 1) when it finds these stale files.
+	steps = append(steps, c.buildCleanFirewallArtifactsStep()...)
+
+	// Step 0b: Pull AWF container images - the detection engine runs inside AWF (firewall),
 	// so pre-pulling the containers speeds up execution and avoids on-demand pulls.
 	steps = append(steps, c.buildPullAWFContainersStep(data)...)
 
@@ -241,6 +248,7 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 			},
 		},
 		ActionCache: data.ActionCache, // Propagate cache so container digest pins are applied
+		Features:    data.Features,    // Propagate features so cli-proxy image is included when enabled
 	}
 
 	images := collectDockerImages(detectionData.Tools, detectionData, c.actionMode)
@@ -263,6 +271,21 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 		}
 	}
 	return steps
+}
+
+// buildCleanFirewallArtifactsStep creates a step that removes stale firewall files
+// from the agent artifact download. Since firewall audit/log files are now included
+// in the unified agent artifact (AWF v0.25.0+), downloading the artifact to /tmp/gh-aw/
+// pre-populates the firewall directories with the agent job's squid.conf, cache.log, etc.
+// If AWF finds these pre-existing files when it starts in the detection job, the squid
+// container may fail to start (exit code 1). This step removes them so AWF gets a clean slate.
+func (c *Compiler) buildCleanFirewallArtifactsStep() []string {
+	return []string{
+		"      - name: Clean stale firewall artifacts\n",
+		"        run: |\n",
+		fmt.Sprintf("          rm -rf %s\n", constants.AWFProxyLogsDir),
+		fmt.Sprintf("          rm -rf %s\n", constants.AWFAuditDir),
+	}
 }
 
 // buildDetectionGuardStep creates a guard step that checks if detection should run.
