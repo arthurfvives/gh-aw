@@ -108,3 +108,22 @@ func TestBuildPullAWFContainersStep(t *testing.T) {
 			"detection download step should include digest-pinned image reference")
 	})
 }
+
+// TestBuildCleanFirewallArtifactsStep verifies that the detection job includes a step
+// to remove stale firewall directories before AWF starts.
+func TestBuildCleanFirewallArtifactsStep(t *testing.T) {
+	compiler := &Compiler{actionMode: ActionModeRelease}
+
+	steps := compiler.buildCleanFirewallArtifactsStep()
+	require.NotEmpty(t, steps, "expected non-empty steps for clean firewall artifacts")
+
+	joined := strings.Join(steps, "")
+	assert.Contains(t, joined, "Clean stale firewall artifacts",
+		"step should have descriptive name")
+	assert.Contains(t, joined, constants.AWFProxyLogsDir,
+		"step should remove AWF proxy logs directory")
+	assert.Contains(t, joined, constants.AWFAuditDir,
+		"step should remove AWF audit directory")
+	assert.Contains(t, joined, "rm -rf",
+		"step should use rm -rf to recursively remove directories")
+}
