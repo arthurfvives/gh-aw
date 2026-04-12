@@ -127,3 +127,4 @@ func TestBuildCleanFirewallArtifactsStep(t *testing.T) {
 	assert.Contains(t, joined, "rm -rf",
 		"step should use rm -rf to recursively remove directories")
 }
+
