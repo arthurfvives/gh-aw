@@ -241,6 +241,7 @@ func (c *Compiler) buildPullAWFContainersStep(data *WorkflowData) []string {
 			},
 		},
 		ActionCache: data.ActionCache, // Propagate cache so container digest pins are applied
+		Features:    data.Features,    // Propagate features so cli-proxy image is included when enabled
 	}
 
 	images := collectDockerImages(detectionData.Tools, detectionData, c.actionMode)
