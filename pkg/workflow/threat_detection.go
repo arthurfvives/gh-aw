@@ -182,11 +182,11 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData) []string {
 	// Comment separator
 	steps = append(steps, "      # --- Threat Detection ---\n")
 
-	// Step 0a: Clean stale firewall directories from the agent artifact.
-	// The agent artifact now includes firewall audit/log files (AWF v0.25.0+),
-	// and the detection job downloads this artifact to /tmp/gh-aw/. If AWF finds
-	// pre-existing files in its logs/audit directories (e.g. squid.conf, cache.log),
-	// the squid container may fail to start. Remove them before AWF runs.
+	// Step 0a: Clean stale firewall directories left by the agent artifact download.
+	// Since #25868, the unified agent artifact includes firewall audit/log files.
+	// The detection job downloads this artifact to /tmp/gh-aw/, which pre-populates
+	// the firewall directories with stale squid.conf, cache.log, etc. from the agent.
+	// AWF's squid container fails to start (exit 1) when it finds these stale files.
 	steps = append(steps, c.buildCleanFirewallArtifactsStep()...)
 
 	// Step 0b: Pull AWF container images - the detection engine runs inside AWF (firewall),
